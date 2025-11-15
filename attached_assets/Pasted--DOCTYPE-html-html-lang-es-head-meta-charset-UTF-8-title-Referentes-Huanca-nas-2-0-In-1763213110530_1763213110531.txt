@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Referentes Huancaínas 2.0 — Intercultural Wanka</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- ============================
+         ESTILOS CSS
+============================ -->
+<style>
+    body {
+        margin: 0;
+        font-family: 'Poppins', sans-serif;
+        background: #f7f3f0;
+        color: #2f2f2f;
+    }
+
+    /* Paleta Wanka */
+    :root {
+        --wanka-red: #8C2C3E;
+        --wanka-yellow: #E9C46A;
+        --wanka-blue: #2A9D8F;
+        --wanka-cream: #F4EDE4;
+        --wanka-dark: #2F2E41;
+    }
+
+    /* NAVBAR */
+    nav {
+        position: fixed;
+        width: 100%;
+        top: 0;
+        left: 0;
+        background: var(--wanka-red);
+        color: white;
+        padding: 15px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        z-index: 999;
+    }
+
+    nav h2 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 600;
+    }
+
+    nav .menu a {
+        margin-left: 20px;
+        color: white;
+        text-decoration: none;
+        font-weight: 500;
+        transition: 0.3s;
+    }
+
+    nav .menu a:hover {
+        opacity: 0.7;
+    }
+
+    /* SECCIONES */
+    section {
+        padding: 100px 25px 50px;
+        display: none;
+    }
+
+    section.active {
+        display: block;
+        animation: fade 0.5s ease-in-out;
+    }
+
+    @keyframes fade {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    /* HERO */
+    .hero {
+        background: url('https://images.unsplash.com/photo-1581349486138-5c87ee48f6a4?auto=format&fit=crop&q=80') center/cover;
+        height: 75vh;
+        border-radius: 15px;
+        padding: 40px;
+        color: white;
+        display: flex;
+        align-items: flex-end;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    }
+
+    .hero h1 {
+        font-size: 38px;
+        margin: 0;
+        text-shadow: 0 3px 10px black;
+    }
+
+    .hero p {
+        font-size: 18px;
+        max-width: 400px;
+        text-shadow: 0 3px 10px black;
+    }
+
+    /* CARDS DE REFERENTES */
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 20px;
+    }
+
+    .card {
+        background: white;
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+        cursor: pointer;
+        transition: transform 0.3s;
+    }
+
+    .card:hover {
+        transform: scale(1.05);
+    }
+
+    .card img {
+        width: 100%;
+        height: 180px;
+        object-fit: cover;
+    }
+
+    .card .info {
+        padding: 15px;
+    }
+
+    /* MODAL */
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        display: none;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal.active {
+        display: flex;
+    }
+
+    .modal-content {
+        background: white;
+        width: 90%;
+        max-width: 500px;
+        padding: 20px;
+        border-radius: 15px;
+    }
+
+    .close {
+        float: right;
+        cursor: pointer;
+        font-size: 22px;
+        color: var(--wanka-red);
+    }
+
+    /* CHATBOT */
+    #chatbox {
+        background: white;
+        padding: 20px;
+        border-radius: 15px;
+        height: 350px;
+        overflow-y: auto;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+    }
+
+    #chat-input {
+        width: 80%;
+        padding: 10px;
+        border-radius: 10px;
+        border: solid 1px #bbb;
+    }
+
+    .msg-user { text-align: right; margin: 10px 0; }
+    .msg-bot { text-align: left; margin: 10px 0; color: var(--wanka-blue); }
+
+</style>
+</head>
+<body>
+
+<!-- ============================
+         NAVBAR
+============================ -->
+<nav>
+    <h2>Referentes Huancaínas 2.0</h2>
+    <div class="menu">
+        <a onclick="show('home')">Inicio</a>
+        <a onclick="show('referentes')">Referentes</a>
+        <a onclick="show('cursos')">Cursos</a>
+        <a onclick="show('mapa')">Mapa Wanka</a>
+        <a onclick="show('foro')">Comunidad</a>
+        <a onclick="show('chat')">Chatbot</a>
+    </div>
+</nav>
+
+<!-- ============================
+         HOME
+============================ -->
+<section id="home" class="active">
+    <div class="hero">
+        <div>
+            <h1>Mujeres Wanka liderando el cambio</h1>
+            <p>Descubre historias inspiradoras de liderazgo femenino desde el corazón de Huancayo.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ============================
+       LISTA DE REFERENTES
+============================ -->
+<section id="referentes">
+    <h2>Referentes Huancaínas</h2>
+    <div class="grid" id="ref-list"></div>
+</section>
+
+<!-- MODAL PERFIL -->
+<div class="modal" id="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">×</span>
+        <h2 id="modal-name"></h2>
+        <img id="modal-photo" style="width:100%; border-radius:10px; margin-bottom:15px">
+        <p id="modal-bio"></p>
+    </div>
+</div>
+
+<!-- ============================
+         CURSOS
+============================ -->
+<section id="cursos">
+    <h2>Cursos Interculturales Wanka</h2>
+    <ul>
+        <li><strong>Liderazgo Femenino Wanka</strong> — 4 semanas</li>
+        <li><strong>Mujer y Emprendimiento Rural</strong> — 3 semanas</li>
+        <li><strong>Identidad Cultural y Memoria Andina</strong> — 2 semanas</li>
+    </ul>
+</section>
+
+<!-- ============================
+         MAPA WANKA (Simulado)
+============================ -->
+<section id="mapa">
+    <h2>Mapa Wanka de Referentes</h2>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/Provincia_de_Huancayo.png"
+         style="width:100%; border-radius:15px; box-shadow:0 5px 10px rgba(0,0,0,0.2)">
+</section>
+
+<!-- ============================
+         FORO
+============================ -->
+<section id="foro">
+    <h2>Comunidad Wanka</h2>
+    <textarea placeholder="Escribe tu mensaje..." style="width:100%;height:120px;border-radius:10px;"></textarea>
+    <button style="padding:10px;margin-top:10px;background:var(--wanka-red);color:white;border:none;border-radius:10px;">Publicar</button>
+</section>
+
+<!-- ============================
+         CHATBOT
+============================ -->
+<section id="chat">
+    <h2>Chatbot Intercultural Wanka</h2>
+
+    <div id="chatbox"></div>
+
+    <div style="margin-top:10px;">
+        <input id="chat-input" placeholder="Pregúntame algo...">
+        <button onclick="sendMsg()" style="padding:10px;background:var(--wanka-blue);color:white;border:none;border-radius:10px;">Enviar</button>
+    </div>
+</section>
+
+<!-- ============================
+      JAVASCRIPT LÓGICA
+============================ -->
+<script>
+function show(section) {
+    document.querySelectorAll("section").forEach(sec => sec.classList.remove("active"));
+    document.getElementById(section).classList.add("active");
+}
+
+/* REFERENTES DUMMY */
+const referentes = [
+    {
+        nombre: "Sara Huamán",
+        foto: "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e",
+        biografia: "Lideresa wanka, promotora cultural y defensora de la educación rural para mujeres.",
+    },
+    {
+        nombre: "Julia Quispe",
+        foto: "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e",
+        biografia: "Ingeniera y activista STEM que impulsa la participación femenina en tecnología.",
+    }
+];
+
+/* Mostrar referentes */
+const container = document.getElementById("ref-list");
+referentes.forEach((r,i)=>{
+    container.innerHTML += `
+        <div class="card" onclick="openModal(${i})">
+            <img src="${r.foto}">
+            <div class="info">
+                <h3>${r.nombre}</h3>
+                <p>${r.biografia.slice(0,50)}...</p>
+            </div>
+        </div>`;
+});
+
+/* Modal */
+function openModal(i){
+    const r = referentes[i];
+    document.getElementById("modal-name").innerText = r.nombre;
+    document.getElementById("modal-photo").src = r.foto;
+    document.getElementById("modal-bio").innerText = r.biografia;
+    document.getElementById("modal").classList.add("active");
+}
+
+function closeModal(){
+    document.getElementById("modal").classList.remove("active");
+}
+
+/* CHATBOT */
+function sendMsg(){
+    const input = document.getElementById("chat-input");
+    const chat = document.getElementById("chatbox");
+
+    let userMsg = input.value.trim();
+    if(userMsg === "") return;
+
+    chat.innerHTML += `<p class='msg-user'><strong>Tú:</strong> ${userMsg}</p>`;
+
+    let bot = "";
+
+    if(userMsg.includes("curso"))
+        bot = "Te recomiendo el curso de Liderazgo Femenino Wanka. Es poderoso y transformador 🌄✨";
+    else if(userMsg.includes("mentora"))
+        bot = "Puedes conectar con Sara Huamán, una de nuestras mejores mentoras.";
+    else
+        bot = "Sutiyki warmi, estoy aquí para ayudarte con cursos, mentorías o cultura Wanka ❤️";
+
+    chat.innerHTML += `<p class='msg-bot'><strong>Bot:</strong> ${bot}</p>`;
+    input.value = "";
+    chat.scrollTop = chat.scrollHeight;
+}
+</script>
+
+</body>
+</html>
