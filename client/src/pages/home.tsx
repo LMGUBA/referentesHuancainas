@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Navigation from "@/components/Navigation";
 import Hero from "@/components/Hero";
 import ReferenteCard from "@/components/ReferenteCard";
@@ -8,95 +9,33 @@ import MapSection from "@/components/MapSection";
 import ForumSection from "@/components/ForumSection";
 import ChatbotSection from "@/components/ChatbotSection";
 import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { Referente, Curso } from "@shared/schema";
 
 import portrait1 from "@assets/generated_images/Wanka_woman_leader_portrait_1_ef9f726f.png";
 import portrait2 from "@assets/generated_images/Wanka_woman_leader_portrait_2_8ce50a42.png";
 import portrait3 from "@assets/generated_images/Wanka_woman_leader_portrait_3_dbae5ba8.png";
 import portrait4 from "@assets/generated_images/Wanka_woman_leader_portrait_4_e397305d.png";
 
+const photoMap: Record<string, string> = {
+  "/assets/generated_images/Wanka_woman_leader_portrait_1_ef9f726f.png": portrait1,
+  "/assets/generated_images/Wanka_woman_leader_portrait_2_8ce50a42.png": portrait2,
+  "/assets/generated_images/Wanka_woman_leader_portrait_3_dbae5ba8.png": portrait3,
+  "/assets/generated_images/Wanka_woman_leader_portrait_4_e397305d.png": portrait4,
+};
+
 export default function Home() {
   const [activeSection, setActiveSection] = useState("home");
-  const [selectedReferente, setSelectedReferente] = useState<any>(null);
+  const [selectedReferente, setSelectedReferente] = useState<Referente | null>(null);
   const { toast } = useToast();
 
-  const referentes = [
-    {
-      id: "1",
-      nombre: "Sara Huamán",
-      foto: portrait1,
-      rol: "Lideresa Cultural y Educadora",
-      biografiaCorta: "Lideresa wanka, promotora cultural y defensora de la educación rural para mujeres.",
-      biografia: "Sara Huamán es una destacada lideresa wanka, promotora cultural y defensora de la educación rural para mujeres. Con más de 15 años de experiencia en la región de Huancayo, ha trabajado incansablemente para preservar las tradiciones culturales mientras impulsa la educación y el empoderamiento femenino en comunidades rurales.",
-      logros: [
-        "Fundadora del programa 'Mujeres Wanka Líderes' que ha beneficiado a más de 500 mujeres",
-        "Reconocida por el Ministerio de Cultura por su labor en preservación cultural",
-        "Coordinadora de talleres de liderazgo en 20 comunidades rurales"
-      ]
-    },
-    {
-      id: "2",
-      nombre: "Julia Quispe",
-      foto: portrait2,
-      rol: "Ingeniera y Activista STEM",
-      biografiaCorta: "Ingeniera y activista STEM que impulsa la participación femenina en tecnología.",
-      biografia: "Julia Quispe es una ingeniera apasionada y activista STEM dedicada a impulsar la participación de mujeres y niñas en ciencia y tecnología. Combina su expertise técnico con un profundo compromiso por la inclusión digital en comunidades wanka.",
-      logros: [
-        "Creadora del programa 'Niñas Wanka en Tecnología' con más de 300 participantes",
-        "Mentora de 50+ mujeres en carreras STEM",
-        "Desarrolladora de apps educativas para comunidades rurales"
-      ]
-    },
-    {
-      id: "3",
-      nombre: "Elena Ccahuana",
-      foto: portrait3,
-      rol: "Educadora y Preservadora Cultural",
-      biografiaCorta: "Maestra dedicada a la enseñanza intercultural y preservación de lenguas andinas.",
-      biografia: "Elena Ccahuana ha dedicado su vida a la educación intercultural bilingüe, trabajando para que las nuevas generaciones mantengan viva su lengua y cultura wanka mientras acceden a educación de calidad.",
-      logros: [
-        "30 años de servicio en educación rural",
-        "Autora de materiales didácticos en quechua wanka",
-        "Formadora de docentes en educación intercultural"
-      ]
-    },
-    {
-      id: "4",
-      nombre: "Rosa Vilcapoma",
-      foto: portrait4,
-      rol: "Emprendedora Social",
-      biografiaCorta: "Emprendedora que lidera cooperativas de textiles tradicionales wanka.",
-      biografia: "Rosa Vilcapoma es una emprendedora social que ha revolucionado la economía local al organizar cooperativas de mujeres artesanas. Su trabajo dignifica el arte textil wanka mientras genera oportunidades económicas sostenibles.",
-      logros: [
-        "Fundadora de la Cooperativa 'Warmi Wanka' con 80 artesanas",
-        "Exportación de textiles a mercados internacionales",
-        "Premio Nacional al Emprendimiento Femenino 2023"
-      ]
-    }
-  ];
+  const { data: referentes, isLoading: referentesLoading } = useQuery<Referente[]>({
+    queryKey: ["/api/referentes"],
+  });
 
-  const cursos = [
-    {
-      id: "1",
-      titulo: "Liderazgo Femenino Wanka",
-      descripcion: "Desarrolla habilidades de liderazgo mientras honras tu identidad cultural wanka. Aprende estrategias para liderar con autenticidad y fortaleza.",
-      duracion: "4 semanas",
-      nivel: "Intermedio"
-    },
-    {
-      id: "2",
-      titulo: "Mujer y Emprendimiento Rural",
-      descripcion: "Aprende a crear y gestionar emprendimientos sostenibles en tu comunidad. Desde la planificación hasta la comercialización.",
-      duracion: "3 semanas",
-      nivel: "Principiante"
-    },
-    {
-      id: "3",
-      titulo: "Identidad Cultural y Memoria Andina",
-      descripcion: "Explora la riqueza de la cultura wanka, sus tradiciones, cosmovisión y el valor de preservar nuestra identidad en el mundo moderno.",
-      duracion: "2 semanas",
-      nivel: "Principiante"
-    }
-  ];
+  const { data: cursos, isLoading: cursosLoading } = useQuery<Curso[]>({
+    queryKey: ["/api/cursos"],
+  });
 
   useEffect(() => {
     const handleScroll = () => {
@@ -153,18 +92,30 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {referentes.map((referente) => (
-              <ReferenteCard
-                key={referente.id}
-                nombre={referente.nombre}
-                foto={referente.foto}
-                rol={referente.rol}
-                biografiaCorta={referente.biografiaCorta}
-                onClick={() => setSelectedReferente(referente)}
-              />
-            ))}
-          </div>
+          {referentesLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="space-y-3">
+                  <Skeleton className="h-64 w-full rounded-lg" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {referentes?.map((referente) => (
+                <ReferenteCard
+                  key={referente.id}
+                  nombre={referente.nombre}
+                  foto={photoMap[referente.foto] || referente.foto}
+                  rol={referente.rol}
+                  biografiaCorta={referente.biografia.slice(0, 100) + "..."}
+                  onClick={() => setSelectedReferente(referente)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -179,18 +130,28 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {cursos.map((curso) => (
-              <CourseCard
-                key={curso.id}
-                titulo={curso.titulo}
-                descripcion={curso.descripcion}
-                duracion={curso.duracion}
-                nivel={curso.nivel}
-                onEnroll={() => handleEnroll(curso.titulo)}
-              />
-            ))}
-          </div>
+          {cursosLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="space-y-3">
+                  <Skeleton className="h-48 w-full rounded-lg" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {cursos?.map((curso) => (
+                <CourseCard
+                  key={curso.id}
+                  titulo={curso.titulo}
+                  descripcion={curso.descripcion}
+                  duracion={curso.duracion}
+                  nivel={curso.nivel}
+                  onEnroll={() => handleEnroll(curso.titulo)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -203,10 +164,10 @@ export default function Home() {
           open={!!selectedReferente}
           onClose={() => setSelectedReferente(null)}
           nombre={selectedReferente.nombre}
-          foto={selectedReferente.foto}
+          foto={photoMap[selectedReferente.foto] || selectedReferente.foto}
           rol={selectedReferente.rol}
           biografia={selectedReferente.biografia}
-          logros={selectedReferente.logros}
+          logros={selectedReferente.logros || []}
         />
       )}
     </div>

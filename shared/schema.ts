@@ -61,4 +61,11 @@ export const insertMensajeForoSchema = createInsertSchema(mensajesForo).omit({
 });
 
 export type InsertMensajeForo = z.infer<typeof insertMensajeForoSchema>;
-export type MensajeForo = typeof mensajesForo.$inferSelect;
+export type MensajeForoDB = typeof mensajesForo.$inferSelect;
+
+export type MensajeForo = {
+  id: string;
+  autor: string;
+  contenido: string;
+  fecha: string;
+};
