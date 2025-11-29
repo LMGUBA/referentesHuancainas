@@ -39,6 +39,7 @@ export const cursos = pgTable("cursos", {
   descripcion: text("descripcion").notNull(),
   duracion: text("duracion").notNull(),
   nivel: text("nivel").notNull(),
+  imagen: text("imagen").notNull(),
 });
 
 export const insertCursoSchema = createInsertSchema(cursos).omit({
@@ -58,6 +59,8 @@ export const mensajesForo = pgTable("mensajes_foro", {
 export const insertMensajeForoSchema = createInsertSchema(mensajesForo).omit({
   id: true,
   fecha: true,
+}).pick({
+  contenido: true,
 });
 
 export type InsertMensajeForo = z.infer<typeof insertMensajeForoSchema>;

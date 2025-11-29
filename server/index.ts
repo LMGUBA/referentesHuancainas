@@ -1,8 +1,16 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { initializeDatabase } from "./db";
+import { setupAuth } from "./auth";
 
 const app = express();
+
+// Initialize database
+initializeDatabase();
+
+// Setup authentication
+setupAuth(app);
 
 declare module 'http' {
   interface IncomingMessage {
@@ -74,7 +82,6 @@ app.use((req, res, next) => {
   server.listen({
     port,
     host: "0.0.0.0",
-    reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
   });

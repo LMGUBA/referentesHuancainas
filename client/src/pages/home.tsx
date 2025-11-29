@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import Navigation from "@/components/Navigation";
 import Hero from "@/components/Hero";
 import ReferenteCard from "@/components/ReferenteCard";
@@ -11,6 +11,8 @@ import ChatbotSection from "@/components/ChatbotSection";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Referente, Curso } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 import portrait1 from "@assets/generated_images/Wanka_woman_leader_portrait_1_ef9f726f.png";
 import portrait2 from "@assets/generated_images/Wanka_woman_leader_portrait_2_8ce50a42.png";
@@ -28,6 +30,7 @@ export default function Home() {
   const [activeSection, setActiveSection] = useState("home");
   const [selectedReferente, setSelectedReferente] = useState<Referente | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const { data: referentes, isLoading: referentesLoading } = useQuery<Referente[]>({
     queryKey: ["/api/referentes"],
@@ -35,6 +38,31 @@ export default function Home() {
 
   const { data: cursos, isLoading: cursosLoading } = useQuery<Curso[]>({
     queryKey: ["/api/cursos"],
+  });
+
+  const { data: enrolledCourses } = useQuery<string[]>({
+    queryKey: ["/api/user/courses"],
+    enabled: !!user,
+  });
+
+  const enrollMutation = useMutation({
+    mutationFn: async (courseId: string) => {
+      return await apiRequest('POST', `/api/cursos/${courseId}/enroll`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/courses"] });
+      toast({
+        title: "¡Inscripción exitosa!",
+        description: "Te has inscrito en el curso correctamente.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo inscribir en el curso",
+        variant: "destructive",
+      });
+    },
   });
 
   useEffect(() => {
@@ -60,12 +88,8 @@ export default function Home() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const handleEnroll = (titulo: string) => {
-    console.log('Enrolled in:', titulo);
-    toast({
-      title: "¡Inscripción exitosa!",
-      description: `Te has inscrito en "${titulo}". Pronto recibirás más información.`,
-    });
+  const handleEnroll = (courseId: string) => {
+    enrollMutation.mutate(courseId);
   };
 
   const scrollToReferentes = () => {
@@ -143,11 +167,14 @@ export default function Home() {
               {cursos?.map((curso) => (
                 <CourseCard
                   key={curso.id}
+                  id={curso.id}
                   titulo={curso.titulo}
                   descripcion={curso.descripcion}
                   duracion={curso.duracion}
                   nivel={curso.nivel}
-                  onEnroll={() => handleEnroll(curso.titulo)}
+                  imagen={curso.imagen}
+                  isEnrolled={enrolledCourses?.includes(curso.id)}
+                  onEnroll={() => handleEnroll(curso.id)}
                 />
               ))}
             </div>

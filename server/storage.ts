@@ -1,39 +1,38 @@
 import { type User, type InsertUser, type Referente, type InsertReferente, type Curso, type InsertCurso, type MensajeForo, type MensajeForoDB, type InsertMensajeForo } from "@shared/schema";
+import { db } from "./db";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  
+
   getAllReferentes(): Promise<Referente[]>;
   getReferente(id: string): Promise<Referente | undefined>;
   createReferente(referente: InsertReferente): Promise<Referente>;
-  
+
   getAllCursos(): Promise<Curso[]>;
   getCurso(id: string): Promise<Curso | undefined>;
   createCurso(curso: InsertCurso): Promise<Curso>;
-  
+
   getAllMensajesForo(): Promise<MensajeForo[]>;
-  createMensajeForo(mensaje: InsertMensajeForo): Promise<MensajeForo>;
+  createMensajeForo(mensaje: InsertMensajeForo, userId: number): Promise<MensajeForo>;
+
+  enrollUserInCourse(userId: number, courseId: string): Promise<void>;
+  isUserEnrolledInCourse(userId: number, courseId: string): Promise<boolean>;
+  getUserCourses(userId: number): Promise<string[]>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private referentes: Map<string, Referente>;
-  private cursos: Map<string, Curso>;
-  private mensajesForo: Map<string, MensajeForoDB>;
-
+export class SQLiteStorage implements IStorage {
   constructor() {
-    this.users = new Map();
-    this.referentes = new Map();
-    this.cursos = new Map();
-    this.mensajesForo = new Map();
-    
     this.seedInitialData();
   }
 
   private seedInitialData() {
+    // Check if data already exists
+    const referentesCount = db.prepare('SELECT COUNT(*) as count FROM referentes').get() as { count: number };
+    if (referentesCount.count > 0) return;
+
     const referentesData: InsertReferente[] = [
       {
         nombre: "Sara Huamán",
@@ -81,9 +80,10 @@ export class MemStorage implements IStorage {
       }
     ];
 
+    const insertReferente = db.prepare('INSERT INTO referentes (id, nombre, foto, rol, biografia, logros) VALUES (?, ?, ?, ?, ?, ?)');
     referentesData.forEach(data => {
       const id = randomUUID();
-      this.referentes.set(id, { ...data, id, logros: data.logros || null });
+      insertReferente.run(id, data.nombre, data.foto, data.rol, data.biografia, JSON.stringify(data.logros || []));
     });
 
     const cursosData: InsertCurso[] = [
@@ -91,114 +91,155 @@ export class MemStorage implements IStorage {
         titulo: "Liderazgo Femenino Wanka",
         descripcion: "Desarrolla habilidades de liderazgo mientras honras tu identidad cultural wanka. Aprende estrategias para liderar con autenticidad y fortaleza.",
         duracion: "4 semanas",
-        nivel: "Intermedio"
+        nivel: "Intermedio",
+        imagen: "/assets/curso_liderazgo.jpg"
       },
       {
         titulo: "Mujer y Emprendimiento Rural",
         descripcion: "Aprende a crear y gestionar emprendimientos sostenibles en tu comunidad. Desde la planificación hasta la comercialización.",
         duracion: "3 semanas",
-        nivel: "Principiante"
+        nivel: "Principiante",
+        imagen: "/assets/curso_emprendimiento.jpg"
       },
       {
         titulo: "Identidad Cultural y Memoria Andina",
         descripcion: "Explora la riqueza de la cultura wanka, sus tradiciones, cosmovisión y el valor de preservar nuestra identidad en el mundo moderno.",
         duracion: "2 semanas",
-        nivel: "Principiante"
+        nivel: "Principiante",
+        imagen: "/assets/curso_identidad.jpg"
       }
     ];
 
+    const insertCurso = db.prepare('INSERT INTO cursos (id, titulo, descripcion, duracion, nivel, imagen) VALUES (?, ?, ?, ?, ?, ?)');
     cursosData.forEach(data => {
       const id = randomUUID();
-      this.cursos.set(id, { ...data, id });
-    });
-
-    const mensajesData: InsertMensajeForo[] = [
-      {
-        autor: "María López",
-        contenido: "¡Qué inspirador conocer estas historias! Me encantaría conectar con más mujeres emprendedoras de la región."
-      },
-      {
-        autor: "Carmen Quispe",
-        contenido: "El curso de Liderazgo Femenino Wanka ha transformado mi perspectiva. ¡Altamente recomendado!"
-      }
-    ];
-
-    mensajesData.forEach(data => {
-      const id = randomUUID();
-      this.mensajesForo.set(id, { ...data, id, fecha: new Date() });
+      insertCurso.run(id, data.titulo, data.descripcion, data.duracion, data.nivel, data.imagen);
     });
   }
 
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as any;
+    return user || undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username) as any;
+    return user || undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+    const stmt = db.prepare('INSERT INTO users (username, password) VALUES (?, ?)');
+    const result = stmt.run(insertUser.username, insertUser.password);
+    return {
+      id: result.lastInsertRowid.toString(),
+      username: insertUser.username,
+      password: insertUser.password
+    };
   }
 
   async getAllReferentes(): Promise<Referente[]> {
-    return Array.from(this.referentes.values());
+    const referentes = db.prepare('SELECT * FROM referentes').all() as any[];
+    return referentes.map(r => ({
+      ...r,
+      logros: r.logros ? JSON.parse(r.logros) : null
+    }));
   }
 
   async getReferente(id: string): Promise<Referente | undefined> {
-    return this.referentes.get(id);
+    const referente = db.prepare('SELECT * FROM referentes WHERE id = ?').get(id) as any;
+    if (!referente) return undefined;
+    return {
+      ...referente,
+      logros: referente.logros ? JSON.parse(referente.logros) : null
+    };
   }
 
   async createReferente(insertReferente: InsertReferente): Promise<Referente> {
     const id = randomUUID();
-    const referente: Referente = { ...insertReferente, id, logros: insertReferente.logros || null };
-    this.referentes.set(id, referente);
-    return referente;
+    const stmt = db.prepare('INSERT INTO referentes (id, nombre, foto, rol, biografia, logros) VALUES (?, ?, ?, ?, ?, ?)');
+    stmt.run(id, insertReferente.nombre, insertReferente.foto, insertReferente.rol, insertReferente.biografia, JSON.stringify(insertReferente.logros || []));
+    return {
+      id,
+      ...insertReferente,
+      logros: insertReferente.logros || null
+    };
   }
 
   async getAllCursos(): Promise<Curso[]> {
-    return Array.from(this.cursos.values());
+    return db.prepare('SELECT * FROM cursos').all() as Curso[];
   }
 
   async getCurso(id: string): Promise<Curso | undefined> {
-    return this.cursos.get(id);
+    const curso = db.prepare('SELECT * FROM cursos WHERE id = ?').get(id) as Curso | undefined;
+    return curso || undefined;
   }
 
   async createCurso(insertCurso: InsertCurso): Promise<Curso> {
     const id = randomUUID();
-    const curso: Curso = { ...insertCurso, id };
-    this.cursos.set(id, curso);
-    return curso;
+    const stmt = db.prepare('INSERT INTO cursos (id, titulo, descripcion, duracion, nivel, imagen) VALUES (?, ?, ?, ?, ?, ?)');
+    stmt.run(id, insertCurso.titulo, insertCurso.descripcion, insertCurso.duracion, insertCurso.nivel, insertCurso.imagen);
+    return { id, ...insertCurso };
   }
 
   async getAllMensajesForo(): Promise<MensajeForo[]> {
-    return Array.from(this.mensajesForo.values())
-      .sort((a, b) => b.fecha.getTime() - a.fecha.getTime())
-      .map(msg => ({
-        id: msg.id,
-        autor: msg.autor,
-        contenido: msg.contenido,
-        fecha: msg.fecha.toISOString()
-      }));
+    const mensajes = db.prepare(`
+      SELECT fm.id, u.username as autor, fm.content as contenido, fm.created_at as fecha
+      FROM forum_messages fm
+      JOIN users u ON fm.user_id = u.id
+      ORDER BY fm.created_at DESC
+    `).all() as any[];
+
+    return mensajes.map(msg => ({
+      id: msg.id.toString(),
+      autor: msg.autor,
+      contenido: msg.contenido,
+      fecha: msg.fecha
+    }));
   }
 
-  async createMensajeForo(insertMensaje: InsertMensajeForo): Promise<MensajeForo> {
-    const id = randomUUID();
-    const fecha = new Date();
-    const mensajeDB: MensajeForoDB = { ...insertMensaje, id, fecha };
-    this.mensajesForo.set(id, mensajeDB);
+  async createMensajeForo(mensaje: InsertMensajeForo, userId: number): Promise<MensajeForo> {
+    const stmt = db.prepare('INSERT INTO forum_messages (user_id, content) VALUES (?, ?)');
+    const result = stmt.run(userId, mensaje.contenido);
+
+    const user = db.prepare('SELECT username FROM users WHERE id = ?').get(userId) as { username: string };
+    const newMessage = db.prepare('SELECT created_at FROM forum_messages WHERE id = ?').get(result.lastInsertRowid) as { created_at: string };
+
     return {
-      id,
-      autor: insertMensaje.autor,
-      contenido: insertMensaje.contenido,
-      fecha: fecha.toISOString()
+      id: result.lastInsertRowid.toString(),
+      autor: user.username,
+      contenido: mensaje.contenido,
+      fecha: newMessage.created_at
     };
+  }
+
+  async enrollUserInCourse(userId: number, courseId: string): Promise<void> {
+    const stmt = db.prepare('INSERT OR IGNORE INTO user_courses (user_id, course_id) VALUES (?, ?)');
+    stmt.run(userId, courseId);
+  }
+
+  async isUserEnrolledInCourse(userId: number, courseId: string): Promise<boolean> {
+    const result = db.prepare('SELECT 1 FROM user_courses WHERE user_id = ? AND course_id = ?').get(userId, courseId);
+    return !!result;
+  }
+
+  async getUserCourses(userId: number): Promise<string[]> {
+    const courses = db.prepare('SELECT course_id FROM user_courses WHERE user_id = ?').all(userId) as { course_id: string }[];
+    return courses.map(c => c.course_id);
   }
 }
 
-export const storage = new MemStorage();
+let storageInstance: SQLiteStorage | null = null;
+
+export function getStorage(): SQLiteStorage {
+  if (!storageInstance) {
+    storageInstance = new SQLiteStorage();
+  }
+  return storageInstance;
+}
+
+// For backwards compatibility
+export const storage = new Proxy({} as SQLiteStorage, {
+  get(_target, prop) {
+    return (getStorage() as any)[prop];
+  }
+});
