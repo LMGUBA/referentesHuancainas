@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 
 interface User {
-    id: number;
+    id: string;
     username: string;
 }
 
@@ -25,7 +25,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         queryFn: async (): Promise<User | null> => {
             try {
                 const response = await apiRequest('GET', '/api/auth/me');
-                return response as User;
+                const json = await response.json();
+                return json as User;
             } catch {
                 return null;
             }
