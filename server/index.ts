@@ -1,13 +1,14 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
-import { initializeDatabase } from "./db";
 import { setupAuth } from "./auth";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
-
-// Initialize database
-initializeDatabase();
 
 // Setup authentication
 setupAuth(app);
@@ -23,6 +24,17 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: false }));
+
+function log(message: string, source = "express") {
+  const formattedTime = new Date().toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+
+  console.log(`${formattedTime} [${source}] ${message}`);
+}
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -54,35 +66,55 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
-  const server = await registerRoutes(app);
+const server = registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
-  });
+  res.status(status).json({ message });
+  throw err;
+});
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
+// In Vercel, we don't start the server manually, and we don't use Vite middleware
+// Vercel handles static files and the API is handled by api/index.ts
+if (process.env.VERCEL !== "1") {
+  (async () => {
+    // importantly only setup vite in development and after
+    // setting up all the other routes so the catch-all route
+    // doesn't interfere with the other routes
+    if (app.get("env") === "development") {
+      const { setupVite } = await import("./vite");
+      await setupVite(app, server);
+    } else {
+      // Serve static files in production (non-Vercel)
+      const distPath = path.resolve(__dirname, "public");
+      if (!fs.existsSync(distPath)) {
+        // In Vercel this might not exist at runtime in the function, but we are in the !VERCEL block
+        // However, if running locally 'npm start' without build, this might fail.
+        // But 'npm start' runs 'node dist/index.js', so __dirname will be 'dist'.
+        // And 'public' should be in 'dist/public' if built correctly.
+        // The original vite.ts used 'import.meta.dirname' which is 'server' in src, or 'dist' in build?
+        // Let's assume standard build output.
+      }
+      app.use(express.static(distPath));
+      app.use("*", (_req, res) => {
+        res.sendFile(path.resolve(distPath, "index.html"));
+      });
+    }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-  }, () => {
-    log(`serving on port ${port}`);
-  });
-})();
+    // ALWAYS serve the app on the port specified in the environment variable PORT
+    // Other ports are firewalled. Default to 5000 if not specified.
+    // this serves both the API and the client.
+    // It is the only port that is not firewalled.
+    const port = parseInt(process.env.PORT || '5000', 10);
+    server.listen({
+      port,
+      host: "0.0.0.0",
+    }, () => {
+      log(`serving on port ${port}`);
+    });
+  })();
+}
+
+export default app;

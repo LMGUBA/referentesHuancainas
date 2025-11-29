@@ -51,7 +51,7 @@ export type Curso = typeof cursos.$inferSelect;
 
 export const mensajesForo = pgTable("mensajes_foro", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  autor: text("autor").notNull(),
+  userId: varchar("user_id").notNull().references(() => users.id),
   contenido: text("contenido").notNull(),
   fecha: timestamp("fecha").notNull().defaultNow(),
 });
@@ -72,3 +72,18 @@ export type MensajeForo = {
   contenido: string;
   fecha: string;
 };
+
+export const userCourses = pgTable("user_courses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  courseId: varchar("course_id").notNull().references(() => cursos.id),
+  enrolledAt: timestamp("enrolled_at").defaultNow(),
+});
+
+export const insertUserCourseSchema = createInsertSchema(userCourses).omit({
+  id: true,
+  enrolledAt: true,
+});
+
+export type InsertUserCourse = z.infer<typeof insertUserCourseSchema>;
+export type UserCourse = typeof userCourses.$inferSelect;

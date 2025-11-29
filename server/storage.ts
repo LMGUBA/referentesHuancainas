@@ -1,6 +1,6 @@
-import { type User, type InsertUser, type Referente, type InsertReferente, type Curso, type InsertCurso, type MensajeForo, type MensajeForoDB, type InsertMensajeForo } from "@shared/schema";
+import { type User, type InsertUser, type Referente, type InsertReferente, type Curso, type InsertCurso, type MensajeForo, type InsertMensajeForo, users, referentes, cursos, mensajesForo, userCourses } from "@shared/schema";
 import { db } from "./db";
-import { randomUUID } from "crypto";
+import { eq, sql, desc, and } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -16,22 +16,22 @@ export interface IStorage {
   createCurso(curso: InsertCurso): Promise<Curso>;
 
   getAllMensajesForo(): Promise<MensajeForo[]>;
-  createMensajeForo(mensaje: InsertMensajeForo, userId: number): Promise<MensajeForo>;
+  createMensajeForo(mensaje: InsertMensajeForo, userId: string): Promise<MensajeForo>;
 
-  enrollUserInCourse(userId: number, courseId: string): Promise<void>;
-  isUserEnrolledInCourse(userId: number, courseId: string): Promise<boolean>;
-  getUserCourses(userId: number): Promise<string[]>;
+  enrollUserInCourse(userId: string, courseId: string): Promise<void>;
+  isUserEnrolledInCourse(userId: string, courseId: string): Promise<boolean>;
+  getUserCourses(userId: string): Promise<string[]>;
 }
 
-export class SQLiteStorage implements IStorage {
+export class DatabaseStorage implements IStorage {
   constructor() {
     this.seedInitialData();
   }
 
-  private seedInitialData() {
+  private async seedInitialData() {
     // Check if data already exists
-    const referentesCount = db.prepare('SELECT COUNT(*) as count FROM referentes').get() as { count: number };
-    if (referentesCount.count > 0) return;
+    const referentesCount = await db.select({ count: sql<number>`count(*)` }).from(referentes);
+    if (referentesCount[0].count > 0) return;
 
     const referentesData: InsertReferente[] = [
       {
@@ -80,11 +80,7 @@ export class SQLiteStorage implements IStorage {
       }
     ];
 
-    const insertReferente = db.prepare('INSERT INTO referentes (id, nombre, foto, rol, biografia, logros) VALUES (?, ?, ?, ?, ?, ?)');
-    referentesData.forEach(data => {
-      const id = randomUUID();
-      insertReferente.run(id, data.nombre, data.foto, data.rol, data.biografia, JSON.stringify(data.logros || []));
-    });
+    await db.insert(referentes).values(referentesData);
 
     const cursosData: InsertCurso[] = [
       {
@@ -110,136 +106,120 @@ export class SQLiteStorage implements IStorage {
       }
     ];
 
-    const insertCurso = db.prepare('INSERT INTO cursos (id, titulo, descripcion, duracion, nivel, imagen) VALUES (?, ?, ?, ?, ?, ?)');
-    cursosData.forEach(data => {
-      const id = randomUUID();
-      insertCurso.run(id, data.titulo, data.descripcion, data.duracion, data.nivel, data.imagen);
-    });
+    await db.insert(cursos).values(cursosData);
   }
 
   async getUser(id: string): Promise<User | undefined> {
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as any;
-    return user || undefined;
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username) as any;
-    return user || undefined;
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const stmt = db.prepare('INSERT INTO users (username, password) VALUES (?, ?)');
-    const result = stmt.run(insertUser.username, insertUser.password);
-    return {
-      id: result.lastInsertRowid.toString(),
-      username: insertUser.username,
-      password: insertUser.password
-    };
+    const [user] = await db.insert(users).values(insertUser).returning();
+    return user;
   }
 
   async getAllReferentes(): Promise<Referente[]> {
-    const referentes = db.prepare('SELECT * FROM referentes').all() as any[];
-    return referentes.map(r => ({
-      ...r,
-      logros: r.logros ? JSON.parse(r.logros) : null
-    }));
+    return await db.select().from(referentes);
   }
 
   async getReferente(id: string): Promise<Referente | undefined> {
-    const referente = db.prepare('SELECT * FROM referentes WHERE id = ?').get(id) as any;
-    if (!referente) return undefined;
-    return {
-      ...referente,
-      logros: referente.logros ? JSON.parse(referente.logros) : null
-    };
+    const [referente] = await db.select().from(referentes).where(eq(referentes.id, id));
+    return referente;
   }
 
   async createReferente(insertReferente: InsertReferente): Promise<Referente> {
-    const id = randomUUID();
-    const stmt = db.prepare('INSERT INTO referentes (id, nombre, foto, rol, biografia, logros) VALUES (?, ?, ?, ?, ?, ?)');
-    stmt.run(id, insertReferente.nombre, insertReferente.foto, insertReferente.rol, insertReferente.biografia, JSON.stringify(insertReferente.logros || []));
-    return {
-      id,
-      ...insertReferente,
-      logros: insertReferente.logros || null
-    };
+    const [referente] = await db.insert(referentes).values(insertReferente).returning();
+    return referente;
   }
 
   async getAllCursos(): Promise<Curso[]> {
-    return db.prepare('SELECT * FROM cursos').all() as Curso[];
+    return await db.select().from(cursos);
   }
 
   async getCurso(id: string): Promise<Curso | undefined> {
-    const curso = db.prepare('SELECT * FROM cursos WHERE id = ?').get(id) as Curso | undefined;
-    return curso || undefined;
+    const [curso] = await db.select().from(cursos).where(eq(cursos.id, id));
+    return curso;
   }
 
   async createCurso(insertCurso: InsertCurso): Promise<Curso> {
-    const id = randomUUID();
-    const stmt = db.prepare('INSERT INTO cursos (id, titulo, descripcion, duracion, nivel, imagen) VALUES (?, ?, ?, ?, ?, ?)');
-    stmt.run(id, insertCurso.titulo, insertCurso.descripcion, insertCurso.duracion, insertCurso.nivel, insertCurso.imagen);
-    return { id, ...insertCurso };
+    const [curso] = await db.insert(cursos).values(insertCurso).returning();
+    return curso;
   }
 
   async getAllMensajesForo(): Promise<MensajeForo[]> {
-    const mensajes = db.prepare(`
-      SELECT fm.id, u.username as autor, fm.content as contenido, fm.created_at as fecha
-      FROM forum_messages fm
-      JOIN users u ON fm.user_id = u.id
-      ORDER BY fm.created_at DESC
-    `).all() as any[];
+    const result = await db.select({
+      id: mensajesForo.id,
+      autor: users.username,
+      contenido: mensajesForo.contenido,
+      fecha: mensajesForo.fecha
+    })
+      .from(mensajesForo)
+      .innerJoin(users, eq(mensajesForo.userId, users.id))
+      .orderBy(desc(mensajesForo.fecha));
 
-    return mensajes.map(msg => ({
-      id: msg.id.toString(),
-      autor: msg.autor,
-      contenido: msg.contenido,
-      fecha: msg.fecha
+    return result.map(msg => ({
+      ...msg,
+      fecha: msg.fecha.toISOString()
     }));
   }
 
-  async createMensajeForo(mensaje: InsertMensajeForo, userId: number): Promise<MensajeForo> {
-    const stmt = db.prepare('INSERT INTO forum_messages (user_id, content) VALUES (?, ?)');
-    const result = stmt.run(userId, mensaje.contenido);
+  async createMensajeForo(mensaje: InsertMensajeForo, userId: string): Promise<MensajeForo> {
+    const [newMessage] = await db.insert(mensajesForo).values({
+      ...mensaje,
+      userId
+    }).returning();
 
-    const user = db.prepare('SELECT username FROM users WHERE id = ?').get(userId) as { username: string };
-    const newMessage = db.prepare('SELECT created_at FROM forum_messages WHERE id = ?').get(result.lastInsertRowid) as { created_at: string };
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
 
     return {
-      id: result.lastInsertRowid.toString(),
+      id: newMessage.id,
       autor: user.username,
-      contenido: mensaje.contenido,
-      fecha: newMessage.created_at
+      contenido: newMessage.contenido,
+      fecha: newMessage.fecha.toISOString()
     };
   }
 
-  async enrollUserInCourse(userId: number, courseId: string): Promise<void> {
-    const stmt = db.prepare('INSERT OR IGNORE INTO user_courses (user_id, course_id) VALUES (?, ?)');
-    stmt.run(userId, courseId);
+  async enrollUserInCourse(userId: string, courseId: string): Promise<void> {
+    await db.insert(userCourses).values({
+      userId,
+      courseId
+    }).onConflictDoNothing();
   }
 
-  async isUserEnrolledInCourse(userId: number, courseId: string): Promise<boolean> {
-    const result = db.prepare('SELECT 1 FROM user_courses WHERE user_id = ? AND course_id = ?').get(userId, courseId);
-    return !!result;
+  async isUserEnrolledInCourse(userId: string, courseId: string): Promise<boolean> {
+    const [enrollment] = await db.select()
+      .from(userCourses)
+      .where(and(
+        eq(userCourses.userId, userId),
+        eq(userCourses.courseId, courseId)
+      ));
+    return !!enrollment;
   }
 
-  async getUserCourses(userId: number): Promise<string[]> {
-    const courses = db.prepare('SELECT course_id FROM user_courses WHERE user_id = ?').all(userId) as { course_id: string }[];
-    return courses.map(c => c.course_id);
+  async getUserCourses(userId: string): Promise<string[]> {
+    const courses = await db.select({
+      courseId: userCourses.courseId
+    })
+      .from(userCourses)
+      .where(eq(userCourses.userId, userId));
+
+    return courses.map(c => c.courseId);
   }
 }
 
-let storageInstance: SQLiteStorage | null = null;
+let storageInstance: DatabaseStorage | null = null;
 
-export function getStorage(): SQLiteStorage {
+export function getStorage(): DatabaseStorage {
   if (!storageInstance) {
-    storageInstance = new SQLiteStorage();
+    storageInstance = new DatabaseStorage();
   }
   return storageInstance;
 }
 
-// For backwards compatibility
-export const storage = new Proxy({} as SQLiteStorage, {
-  get(_target, prop) {
-    return (getStorage() as any)[prop];
-  }
-});
+export const storage = getStorage();

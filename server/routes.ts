@@ -5,7 +5,7 @@ import { insertReferenteSchema, insertCursoSchema, insertMensajeForoSchema } fro
 import passport from "passport";
 import { registerUser, requireAuth } from "./auth";
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export function registerRoutes(app: Express): Server {
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {
     try {
