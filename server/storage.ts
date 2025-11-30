@@ -1,6 +1,7 @@
 import { type User, type InsertUser, type Referente, type InsertReferente, type Curso, type InsertCurso, type MensajeForo, type InsertMensajeForo, users, referentes, cursos, mensajesForo, userCourses } from "@shared/schema";
 import { db } from "./db";
 import { eq, sql, desc, and } from "drizzle-orm";
+import { randomUUID } from "crypto";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -163,7 +164,8 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(users, eq(mensajesForo.userId, users.id))
       .orderBy(desc(mensajesForo.fecha));
 
-    return result.map(msg => ({
+    const typed = result as { id: string; autor: string; contenido: string; fecha: Date }[];
+    return typed.map((msg) => ({
       ...msg,
       fecha: msg.fecha.toISOString()
     }));
@@ -209,15 +211,182 @@ export class DatabaseStorage implements IStorage {
       .from(userCourses)
       .where(eq(userCourses.userId, userId));
 
-    return courses.map(c => c.courseId);
+    return courses.map((c: { courseId: string }) => c.courseId);
   }
 }
 
-let storageInstance: DatabaseStorage | null = null;
+class MemoryStorage implements IStorage {
+  private _users = new Map<string, User>();
+  private _referentes = new Map<string, Referente>();
+  private _cursos = new Map<string, Curso>();
+  private _mensajes = new Map<string, MensajeForo>();
+  private _userCourses = new Map<string, Set<string>>();
 
-export function getStorage(): DatabaseStorage {
+  constructor() {
+    this.seed();
+  }
+
+  private seed() {
+    const referentesData: InsertReferente[] = [
+      {
+        nombre: "Sara Huamán",
+        foto: "/assets/generated_images/Wanka_woman_leader_portrait_1_ef9f726f.png",
+        rol: "Lideresa Cultural y Educadora",
+        biografia: "Sara Huamán es una destacada lideresa wanka, promotora cultural y defensora de la educación rural para mujeres.",
+        logros: [
+          "Fundadora del programa 'Mujeres Wanka Líderes'",
+          "Reconocida por el Ministerio de Cultura",
+          "Coordinadora de talleres de liderazgo"
+        ]
+      },
+      {
+        nombre: "Julia Quispe",
+        foto: "/assets/generated_images/Wanka_woman_leader_portrait_2_8ce50a42.png",
+        rol: "Ingeniera y Activista STEM",
+        biografia: "Impulsa la participación de mujeres y niñas en ciencia y tecnología.",
+        logros: [
+          "Programa 'Niñas Wanka en Tecnología'",
+          "Mentora de mujeres en STEM",
+          "Apps educativas para comunidades"
+        ]
+      },
+      {
+        nombre: "Elena Ccahuana",
+        foto: "/assets/generated_images/Wanka_woman_leader_portrait_3_dbae5ba8.png",
+        rol: "Educadora y Preservadora Cultural",
+        biografia: "Educación intercultural bilingüe y preservación de lengua wanka.",
+        logros: [
+          "30 años de servicio",
+          "Materiales didácticos en quechua wanka",
+          "Formación de docentes"
+        ]
+      },
+      {
+        nombre: "Rosa Vilcapoma",
+        foto: "/assets/generated_images/Wanka_woman_leader_portrait_4_e397305d.png",
+        rol: "Emprendedora Social",
+        biografia: "Cooperativas de mujeres artesanas y economía local sostenible.",
+        logros: [
+          "Cooperativa 'Warmi Wanka'",
+          "Exportación de textiles",
+          "Premio Nacional al Emprendimiento Femenino"
+        ]
+      }
+    ];
+
+    referentesData.forEach(r => {
+      const id = randomUUID();
+      this._referentes.set(id, { ...r, id, logros: r.logros ?? [] });
+    });
+
+    const cursosData: InsertCurso[] = [
+      {
+        titulo: "Liderazgo Femenino Wanka",
+        descripcion: "Desarrolla habilidades de liderazgo honrando tu identidad wanka.",
+        duracion: "4 semanas",
+        nivel: "Intermedio",
+        imagen: "/assets/curso_liderazgo.jpg"
+      },
+      {
+        titulo: "Mujer y Emprendimiento Rural",
+        descripcion: "Crea y gestiona emprendimientos sostenibles en tu comunidad.",
+        duracion: "3 semanas",
+        nivel: "Principiante",
+        imagen: "/assets/curso_emprendimiento.jpg"
+      },
+      {
+        titulo: "Identidad Cultural y Memoria Andina",
+        descripcion: "Explora la riqueza de la cultura wanka y su cosmovisión.",
+        duracion: "2 semanas",
+        nivel: "Principiante",
+        imagen: "/assets/curso_identidad.jpg"
+      }
+    ];
+
+    cursosData.forEach(c => {
+      const id = randomUUID();
+      this._cursos.set(id, { ...c, id });
+    });
+  }
+
+  async getUser(id: string): Promise<User | undefined> {
+    return this._users.get(id);
+  }
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    for (const u of Array.from(this._users.values())) if (u.username === username) return u;
+    return undefined;
+  }
+  async createUser(user: InsertUser): Promise<User> {
+    const id = randomUUID();
+    const created = { ...user, id } as User;
+    this._users.set(id, created);
+    return created;
+  }
+
+  async getAllReferentes(): Promise<Referente[]> {
+    return Array.from(this._referentes.values());
+  }
+  async getReferente(id: string): Promise<Referente | undefined> {
+    return this._referentes.get(id);
+  }
+  async createReferente(referente: InsertReferente): Promise<Referente> {
+    const id = randomUUID();
+    const created = { ...referente, id } as Referente;
+    this._referentes.set(id, created);
+    return created;
+  }
+
+  async getAllCursos(): Promise<Curso[]> {
+    return Array.from(this._cursos.values());
+  }
+  async getCurso(id: string): Promise<Curso | undefined> {
+    return this._cursos.get(id);
+  }
+  async createCurso(curso: InsertCurso): Promise<Curso> {
+    const id = randomUUID();
+    const created = { ...curso, id } as Curso;
+    this._cursos.set(id, created);
+    return created;
+  }
+
+  async getAllMensajesForo(): Promise<MensajeForo[]> {
+    return Array.from(this._mensajes.values());
+  }
+  async createMensajeForo(mensaje: InsertMensajeForo, userId: string): Promise<MensajeForo> {
+    const user = await this.getUser(userId);
+    const id = randomUUID();
+    const created: MensajeForo = {
+      id,
+      autor: user?.username || "",
+      contenido: mensaje.contenido,
+      fecha: new Date().toISOString()
+    };
+    this._mensajes.set(id, created);
+    return created;
+  }
+
+  async enrollUserInCourse(userId: string, courseId: string): Promise<void> {
+    const set = this._userCourses.get(userId) || new Set<string>();
+    set.add(courseId);
+    this._userCourses.set(userId, set);
+  }
+  async isUserEnrolledInCourse(userId: string, courseId: string): Promise<boolean> {
+    return this._userCourses.get(userId)?.has(courseId) || false;
+  }
+  async getUserCourses(userId: string): Promise<string[]> {
+    return Array.from(this._userCourses.get(userId) || new Set<string>());
+  }
+}
+
+let storageInstance: IStorage | null = null;
+
+export function getStorage(): IStorage {
   if (!storageInstance) {
-    storageInstance = new DatabaseStorage();
+    if (db) {
+      storageInstance = new DatabaseStorage();
+    } else {
+      storageInstance = new MemoryStorage();
+    }
   }
   return storageInstance;
 }
