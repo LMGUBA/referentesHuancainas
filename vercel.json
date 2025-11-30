@@ -4,9 +4,6 @@
     { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "dist/public" } },
     { "src": "api/index.ts", "use": "@vercel/node" }
   ],
-  "functions": {
-    "api/**": { "runtime": "nodejs20.x" }
-  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
